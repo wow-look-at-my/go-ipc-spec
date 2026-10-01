@@ -23,10 +23,42 @@ test('ring fields fit the control block and do not overlap', () => {
 		assert.equal(f.offset % f.size, 0, `${f.name} is not aligned to its size`);
 		end = f.offset + f.size;
 	}
-	assert.ok(end <= ring.header_size, 'fields run past header_size');
-	assert.equal(ring.header_size, 4 * ring.cache_line);
+	assert.ok(end <= ring.control_size, 'fields run past the control block');
+	assert.equal(ring.control_size, 4 * ring.cache_line);
+	const slots = ring.claim_slots;
+	assert.equal(slots.offset, ring.control_size, 'the claim slot table follows the control block');
+	assert.equal(slots.offset + slots.count * slots.slot_size, ring.header_size, 'the claim slot table ends the header');
+	let slotEnd = 0;
+	for (const f of slots.fields) {
+		assert.ok(f.offset >= slotEnd && f.offset % f.size === 0, `slot field ${f.name} is misplaced`);
+		slotEnd = f.offset + f.size;
+	}
+	assert.ok(slotEnd <= slots.slot_size, 'slot fields run past the slot');
 	for (const n of ['tail', 'head', 'head_cache']) {
 		assert.equal(field(n).offset % ring.cache_line, 0, `${n} must start a cache line`);
+	}
+});
+
+const values = readJSON('vectors/schema/values.json');
+const invalid = readJSON('vectors/schema/invalid.json');
+const schemaSrc = readFileSync(join(root, 'vectors/schema/example.ipc'), 'utf8');
+const declared = new Set([...schemaSrc.matchAll(/^message\s+(\w+)/gm)].map((m) => m[1]));
+
+test('every schema value has an encoding and every encoding has a value', () => {
+	const bins = readdirSync(join(root, 'vectors/schema')).filter((f) => f.endsWith('.bin')).sort();
+	const want = values.map((_: unknown, i: number) => `${i}.bin`).sort();
+	assert.deepEqual(bins, want);
+});
+
+test('schema vectors name only declared messages and known error kinds', () => {
+	for (const [i, v] of values.entries()) {
+		assert.ok(declared.has(v.message), `values.json entry ${i} names undeclared message ${v.message}`);
+	}
+	const kinds = new Set(['short', 'length', 'trailing', 'bool', 'utf8']);
+	for (const [i, v] of invalid.entries()) {
+		assert.ok(declared.has(v.message), `invalid.json entry ${i} names undeclared message ${v.message}`);
+		assert.ok(kinds.has(v.error), `invalid.json entry ${i} has unknown kind ${v.error}`);
+		assert.match(v.hex, /^([0-9a-f]{2})*$/, `invalid.json entry ${i} is not lower-case hex`);
 	}
 });
 

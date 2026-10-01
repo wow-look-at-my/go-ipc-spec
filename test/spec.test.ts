@@ -30,6 +30,29 @@ test('ring fields fit the control block and do not overlap', () => {
 	}
 });
 
+const values = readJSON('vectors/schema/values.json');
+const invalid = readJSON('vectors/schema/invalid.json');
+const schemaSrc = readFileSync(join(root, 'vectors/schema/example.ipc'), 'utf8');
+const declared = new Set([...schemaSrc.matchAll(/^message\s+(\w+)/gm)].map((m) => m[1]));
+
+test('every schema value has an encoding and every encoding has a value', () => {
+	const bins = readdirSync(join(root, 'vectors/schema')).filter((f) => f.endsWith('.bin')).sort();
+	const want = values.map((_: unknown, i: number) => `${i}.bin`).sort();
+	assert.deepEqual(bins, want);
+});
+
+test('schema vectors name only declared messages and known error kinds', () => {
+	for (const [i, v] of values.entries()) {
+		assert.ok(declared.has(v.message), `values.json entry ${i} names undeclared message ${v.message}`);
+	}
+	const kinds = new Set(['short', 'length', 'trailing', 'bool', 'utf8']);
+	for (const [i, v] of invalid.entries()) {
+		assert.ok(declared.has(v.message), `invalid.json entry ${i} names undeclared message ${v.message}`);
+		assert.ok(kinds.has(v.error), `invalid.json entry ${i} has unknown kind ${v.error}`);
+		assert.match(v.hex, /^([0-9a-f]{2})*$/, `invalid.json entry ${i} is not lower-case hex`);
+	}
+});
+
 const manifest = readJSON('vectors/ring/manifest.json');
 const ringDir = join(root, 'vectors/ring');
 

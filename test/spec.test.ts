@@ -53,5 +53,13 @@ for (const c of manifest.cases) {
 		assert.equal(u64('head'), BigInt(c.head));
 		assert.equal(u64('tail'), BigInt(c.tail));
 		assert.ok(u64('tail') - u64('head') <= capacity, 'more bytes in flight than capacity');
+
+		const data = img.subarray(ring.header_size, ring.header_size + Number(capacity));
+		const live = Number(u64('tail') - u64('head'));
+		const start = Number(u64('head') & (capacity - 1n));
+		for (let off = live; off < data.length; off++) {
+			const i = (start + off) % data.length;
+			assert.equal(data[i], 0, `byte ${i} of the data region is outside [head, tail) and must be zero`);
+		}
 	});
 }

@@ -23,8 +23,17 @@ test('ring fields fit the control block and do not overlap', () => {
 		assert.equal(f.offset % f.size, 0, `${f.name} is not aligned to its size`);
 		end = f.offset + f.size;
 	}
-	assert.ok(end <= ring.header_size, 'fields run past header_size');
-	assert.equal(ring.header_size, 4 * ring.cache_line);
+	assert.ok(end <= ring.control_size, 'fields run past the control block');
+	assert.equal(ring.control_size, 4 * ring.cache_line);
+	const slots = ring.claim_slots;
+	assert.equal(slots.offset, ring.control_size, 'the claim slot table follows the control block');
+	assert.equal(slots.offset + slots.count * slots.slot_size, ring.header_size, 'the claim slot table ends the header');
+	let slotEnd = 0;
+	for (const f of slots.fields) {
+		assert.ok(f.offset >= slotEnd && f.offset % f.size === 0, `slot field ${f.name} is misplaced`);
+		slotEnd = f.offset + f.size;
+	}
+	assert.ok(slotEnd <= slots.slot_size, 'slot fields run past the slot');
 	for (const n of ['tail', 'head', 'head_cache']) {
 		assert.equal(field(n).offset % ring.cache_line, 0, `${n} must start a cache line`);
 	}

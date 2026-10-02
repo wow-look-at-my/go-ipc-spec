@@ -21,10 +21,14 @@ A peer exits 0 on success. On any failure it prints the reason to stderr and exi
 | `recv-then-stop` | `<name> <count> <capacity> <mode>` | Create queue `name` with `capacity`. Print `ready`. Receive `count` messages, checked as `recv` checks them. Print `ok <count>`. With mode `close`: close the queue, unlink it, and exit 0. With mode `exit`: unlink the queue, then exit at once with status 0, without a close, as `_exit(0)` does. |
 | `chan-recv-until-gone` | `<name> <capacity> <count>` | Create channel `name` with `capacity`. Print `ready`. Receive until a receive reports peer-gone. Message `i` must have type `i` and payload `0:<i>`. Require exactly `count` messages. Then require that a send on the channel reports peer-gone. Print `ok <count>`. Close and unlink. |
 | `chan-send-then-stop` | `<name> <count> <mode>` | Open channel `name`. Send `count` messages, message `i` with type `i` and payload `0:<i>`. With mode `close`: close the channel and exit 0. With mode `exit`: exit at once with status 0, without a close. |
+| `service-serve` | `<name> <capacity> <clients>` | Serve the service `name` with `capacity` for its queue, as `service.md` says. Print `ready`. Answer a request of type 1 with a reply of type 2 and the same payload. Answer a request of type 3 with an error whose message is the payload as UTF-8. Answer a request of type 4 with a reply of type 5 whose payload is the client's ordinal as a `u64`, little-endian. Any other type is a failure. Count the clients that go. When `clients` of them have gone, print `ok <clients>`, close and unlink. |
+| `service-call` | `<name> <count> <mode>` | Connect to the service `name`. For `i` from 0 below `count`: call type 1 with payload `<i>`, and require reply type 2 with payload `<i>`; call type 3 with payload `boom <i>`, and require a call error with message `boom <i>`. Then call type 4 with an empty payload, and require reply type 5 with a `u64` that equals the ordinal the connect reported. Print `ok <count>`. With mode `close`: close the connection and exit 0. With mode `exit`: exit at once with status 0, without a close. |
 
 `dial-check` writes and reads at the same time. The ring holds less than the stream, so a peer that writes everything before it reads deadlocks.
 
 An exit "at once" skips every exit handler, destructor and close. The roles that use it stand in for a process that dies. Its life socket closes with it. That is the only signal its peers get.
+
+The service early cell starts the client before the server exists. The client has no `ready` line to wait for. The suite starts the server as soon as the client runs. A client that polled for the server will still pass this cell. `service.md` forbids that, and the no-CPU tests of each implementation hold it to that.
 
 The suite runs these roles in the following cells, for every ordered pair of languages A and B. Each cell uses a capacity of 4096.
 
@@ -33,6 +37,8 @@ The suite runs these roles in the following cells, for every ordered pair of lan
 | recover | `recv` in B for `2k` messages. Then, one after another, each to its exit: `claim-and-die` in A with length 64, `send` in A as sender 0 with `k` messages, `claim-and-die` in A with length 1500, `send` in B as sender 1 with `k` messages. B prints `ok <2k>`. |
 | receiver gone | `recv-then-stop` in A for `k` messages, in mode `close` and in mode `exit`. `send-until-gone` in B. A prints `ok <k>`. B prints `gone <n>` with `n` of at least `k`. |
 | channel peer gone | `chan-recv-until-gone` in A for `k` messages. `chan-send-then-stop` in B, in mode `close` and in mode `exit`. A prints `ok <k>`. |
+| service | `service-serve` in A for 2 clients. Then `service-call` in B for `k` calls in mode `close`, and another in mode `exit`, at the same time. A prints `ok 2`. Each client prints `ok <k>`. |
+| service early | `service-call` in B for `k` calls in mode `close`, started first. Then `service-serve` in A for 1 client, started while the client waits. A prints `ok 1`. The client prints `ok <k>`. |
 
 The recover cell places its claims at fixed cursors, whatever the timing:
 

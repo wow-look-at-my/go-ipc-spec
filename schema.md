@@ -29,7 +29,7 @@ message Point = 11 {
 - The type ID is a `u32`, written in decimal or as `0x` hex. It is unique in the schema. It must not be `0xFFFFFFFF`.
 - A name must not be a keyword of C, C++, Go or Python. It must not start with `ipcgen`.
 - A name must not clash with a generated name. `ipcgen` rejects these field names: `size`, `encode`, `decode`, `type_id`, `fixed_size`, `self`, `cls`.
-- `ipcgen` also rejects a field that spells a Go method, a message called `MESSAGES`, and a message `<M>Type` beside a message `<M>`.
+- `ipcgen` also rejects a field that spells a Go method, a message called `MESSAGES`, `Message` or `NewMessage`, and a message `<M>Type` beside a message `<M>`.
 - Messages must not share one C name, and fields of a message must not share one Go name.
 
 ## Types
@@ -62,7 +62,7 @@ A message encodes as its fixed section and then its variable tail.
 
 | language | output |
 | --- | --- |
-| Go | a struct per message, `<M>Type` constant, `Size()`, `MarshalTo([]byte) int`, `MarshalBinary`, `UnmarshalBinary` |
+| Go | a struct per message, `<M>Type` constant, `TypeID() uint32`, `Size()`, `MarshalTo([]byte) int`, `MarshalBinary`, `UnmarshalBinary`; a `Message` interface those methods satisfy, and `NewMessage(typeID uint32) Message`, which returns an empty message of that type or nil |
 | C | a header with a struct per message, `DEMO_<M>_TYPE`, `demo_<m>_size`, `demo_<m>_encode`, `demo_<m>_decode`. Decode makes each variable field a pointer into the input plus a length, with no copy. |
 | C++ | a header in `namespace demo` with a struct per message, `type_id`, `size()`, `encode(std::span<std::byte>)`, `static decode(std::span<const std::byte>)` |
 | Python | a module with a dataclass per message, `TYPE_ID`, `encode() -> bytes`, `decode(buf)`, and `MESSAGES` mapping each type ID to its class |

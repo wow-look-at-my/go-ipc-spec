@@ -16,6 +16,7 @@ Scope: Linux. All integers on the wire are little-endian. All atomic operations 
 | `vectors/ring/manifest.json` | ring operations to replay, plus the expected records |
 | `vectors/ring/*.bin` | the exact ring image that each replay must produce |
 | `schema.md` | the `ipcgen` schema language and its wire encoding |
+| `service.md` | the request and reply layer: names, handshake, framing and the error reply |
 | `peer.md` | the command-line contract that the cross-language tests drive |
 
 ## Names

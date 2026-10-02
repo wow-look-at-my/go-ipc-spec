@@ -39,6 +39,20 @@ test('ring fields fit the control block and do not overlap', () => {
 	}
 });
 
+test('service types sit below the padding type and do not collide', () => {
+	const svc = wire.service;
+	const types = [svc.type_knock, svc.type_hello, svc.type_error];
+	assert.equal(new Set(types).size, types.length, 'service record types collide');
+	for (const t of types) {
+		assert.ok(t >= svc.reserved_type_min, `service type ${t} lies outside the reserved range`);
+		assert.ok(t < ring.type_padding, `service type ${t} collides with padding`);
+	}
+	assert.ok(svc.reserved_type_min > wire.conn.type_eof, 'the reserved range overlaps the conn types');
+	assert.equal(svc.sequence_size, 8);
+	assert.equal(svc.first_sequence, 1);
+	assert.equal(svc.client_id_hex_digits, wire.paths.instance_id_hex_digits);
+});
+
 const values = readJSON('vectors/schema/values.json');
 const invalid = readJSON('vectors/schema/invalid.json');
 const schemaSrc = readFileSync(join(root, 'vectors/schema/example.ipc'), 'utf8');

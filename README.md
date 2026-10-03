@@ -55,7 +55,7 @@ A procID is a u64 that names one process for its whole life.
 - Bit 63 means that a life socket stands behind the procID. A process that cannot listen on its life socket clears bit 63 and keeps every other bit.
 - Bit 62 is always set. So a procID never equals 0 or 1, which have their own meaning in the `consumer` field.
 
-A process makes its procID once, the first time it creates or opens a queue, a channel or a conn. It keeps it until it exits. Its life socket listens before the procID first reaches shared memory. Otherwise a peer can find no socket and judge the process dead.
+A process makes its procID once, the first time it creates or opens a queue, a channel or a conn. It keeps it until it exits. A release does not change it. Its life socket listens before the procID first reaches shared memory. Otherwise a peer can find no socket and judge the process dead.
 
 ### Life socket
 
@@ -69,7 +69,7 @@ A process makes its procID once, the first time it creates or opens a queue, a c
 
 On any failure, close the socket, remove the `.tmp` path, and run without a life socket: clear bit 63 of the procID. The rename comes after the listen because a bound socket that does not listen refuses a dial. The sweep removes every life socket that refuses. The sweep never touches a `.tmp` name.
 
-**Serve.** Accept every connection. Hold each connection open and read from it until end-of-file or an error, discarding the bytes, then close it. Never write to a connection. Never remove the socket file on exit. The sweep removes it. The kernel closes every connection to the socket when the process exits, however it exits. A connection that waits in the backlog ends with the process too. A process must still accept, because the backlog is bounded.
+**Serve.** Accept every connection. Hold each connection open and read from it until end-of-file or an error, discarding the bytes, then close it. Never write to a connection. Never remove the socket file, except through release. The sweep removes the socket of a process that did not release it. The kernel closes every connection to the socket when the process exits, however it exits. A connection that waits in the backlog ends with the process too. A process must still accept, because the backlog is bounded.
 
 A child that a process forks without an exec inherits the listening socket. The life of the parent then ends when the last of them exits. `SOCK_CLOEXEC` keeps an exec from inheriting it.
 
@@ -83,6 +83,15 @@ A child that a process forks without an exec inherits the listening socket. The 
 4. A read that fails runs a check of `p`. When `p` is gone, it exited. Otherwise the watch fails with the read error.
 
 Closing the connection cancels the watch. One connection per watched process is enough, however many parts of the process watch it.
+
+**Release.** A process calls release before it exits, so that it leaves no socket file behind.
+
+1. When the process has no life socket, do nothing. A process with no procID yet has none. A procID with bit 63 clear has none. A forked child that has not made its own procID has none. Release never makes a procID.
+2. Remove the life socket path. A missing file is not an error. Report any other failure.
+
+Release keeps the listener and every accepted connection open. The kernel still closes them when the process exits. So a watch that started before the release ends at the exit, as before. A check or a watch that starts after the release finds `ENOENT`, and judges the process gone. A second release does nothing.
+
+Release is the last operation of the process on any endpoint. After it, the process must not create, open, send, claim or receive, because its peers can already judge it gone. It may still close its handles.
 
 Process ids, start times and pid namespaces play no part in this. A timeout never decides that a process is gone.
 
@@ -213,7 +222,7 @@ The consumer of a queue runs this after a read delivered no record. It finds the
 
 A claim that crossed the wrap point comes back one lap segment at a time. The first pass pads up to the end of the data region. The next stall is at index 0, inside the same intent, and the next pass pads the rest and clears the slots.
 
-The compare-and-swap in step 7 is what keeps a live producer safe. A producer that commits after the load of `L` changes `len`, so the swap fails.
+The compare-and-swap in step 7 is what keeps a live producer safe. A producer that commits after the load of `L` changes `len`. As a result, the swap fails.
 
 A watch on a producer signals the `.ne` event once when the producer exits. The parked consumer then wakes and runs the recovery again. A watch that fails makes every later receive that needs it report the failure.
 

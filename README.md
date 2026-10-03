@@ -6,7 +6,7 @@ go-ipc's `docs/design.md` explains why the protocol has this shape. This file st
 
 This is version 2 of the protocol. A version 2 process does not interoperate with a version 1 process. The ring `version` field tells them apart.
 
-Scope: Linux. All integers on the wire are little-endian. All atomic operations named here are sequentially consistent unless the text says otherwise. The Go package also runs on macOS and Windows, and as a cosmo binary. Its socket event backend for a cosmo binary on a Windows host is Go-only and out of scope here.
+Scope: Linux and macOS. All integers on the wire are little-endian. All atomic operations named here are sequentially consistent unless the text says otherwise. The hosts differ in one point: the runtime directory. It is `/dev/shm` on Linux and the per-user temporary directory on macOS, which is `$TMPDIR` or `/tmp`. Every path below is written with the Linux directory, and an implementation on macOS puts the same file names under its own. The event mechanism is the same on both: a FIFO, and a waiter parked in `poll` or in a poller. The Go package also runs on Windows, and as a cosmo binary. Its socket event backend for a cosmo binary on a Windows host is Go-only and out of scope here.
 
 ## Files
 
@@ -24,7 +24,7 @@ A name is a non-empty string. It must not contain `/` or `\`. It must not be `.`
 
 ## Paths
 
-Every file lives in the runtime directory `/dev/shm`. Every file that this protocol creates has mode `0600`. The placeholders are these:
+Every file lives in the runtime directory: `/dev/shm` on Linux, and `$TMPDIR` (or `/tmp` when it is unset) on macOS. The table below spells the Linux one. Every file that this protocol creates has mode `0600`. The placeholders are these:
 
 | placeholder | format |
 | --- | --- |

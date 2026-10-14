@@ -67,5 +67,16 @@
   "conn": {
     "type_data": 0,
     "type_eof": 1
+  },
+  "service": {
+    "registry_suffix": ".svc",
+    "client_prefix": ".c.",
+    "client_id_hex_digits": 16,
+    "reserved_type_min": 4294967280,
+    "type_knock": 4294967280,
+    "type_hello": 4294967281,
+    "type_error": 4294967282,
+    "sequence_size": 8,
+    "first_sequence": 1
   }
 }
